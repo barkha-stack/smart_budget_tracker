@@ -1,0 +1,30 @@
+<h2>Dashboard</h2>
+
+<h3>Balance: ₹{{ balance }}</h3>
+
+<hr>
+
+<h3>Add Income</h3>
+<form method="post">
+    {% csrf_token %}
+    {{ income_form.as_p }}
+    <button type="submit" name="income_submit">Add Income</button>
+</form>
+
+<hr>
+
+<h3>Add Expense</h3>
+<form method="post">
+    {% csrf_token %}
+    {{ expense_form.as_p }}
+    <button type="submit" name="expense_submit">Add Expense</button>
+</form>
+
+<hr>
+
+<h3>Your Expenses</h3>
+<ul>
+    {% for e in expenses %}
+        <li>{{ e.title }} - ₹{{ e.amount }} ({{ e.category }})</li>
+    {% endfor %}
+</ul>
