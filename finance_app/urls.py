@@ -1,5 +1,8 @@
 from django.urls import path
-from . import views
+from finance_app import views
+
+app_name = "finance_app"
+
 urlpatterns = [
-    path('', views.dashboard, name='dashboard'),
+    path("", views.dashboard, name="dashboard"),
 ]

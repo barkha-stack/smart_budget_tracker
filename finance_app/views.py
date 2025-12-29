@@ -1,51 +1,69 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from .models import Income, Expense
-from .forms import IncomeForm, ExpenseForm
+from django.db.models import Sum
+from datetime import date
 
-# -----------------------------
-# DASHBOARD VIEW
-# -----------------------------
+from .models import Income, Expense, Budget
+
+
 @login_required
 def dashboard(request):
-    # Handle income form submission
-    if request.method == 'POST' and 'income_submit' in request.POST:
-        income_form = IncomeForm(request.POST)
-        if income_form.is_valid():
-            income = income_form.save(commit=False)
-            income.user = request.user
-            income.save()
-            return redirect('dashboard')
+    user = request.user
+    today = date.today()
 
-    # Handle expense form submission
-    elif request.method == 'POST' and 'expense_submit' in request.POST:
-        expense_form = ExpenseForm(request.POST)
-        if expense_form.is_valid():
-            expense = expense_form.save(commit=False)
-            expense.user = request.user
-            expense.save()
-            return redirect('dashboard')
+    total_income = (
+        Income.objects.filter(user=user)
+        .aggregate(total=Sum("amount"))["total"] or 0
+    )
 
-    else:
-        income_form = IncomeForm()
-        expense_form = ExpenseForm()
+    total_expense = (
+        Expense.objects.filter(user=user)
+        .aggregate(total=Sum("amount"))["total"] or 0
+    )
 
-    # Fetch user data
-    incomes = Income.objects.filter(user=request.user)
-    expenses = Expense.objects.filter(user=request.user)
-
-    total_income = sum(i.amount for i in incomes)
-    total_expense = sum(e.amount for e in expenses)
     balance = total_income - total_expense
 
+    budgets = Budget.objects.filter(
+        user=user,
+        month=today.month,
+        year=today.year
+    )
+
+    budget_status = []
+
+    for budget in budgets:
+        spent = (
+            Expense.objects.filter(
+                user=user,
+                category=budget.category,
+                date__month=today.month,
+                date__year=today.year
+            ).aggregate(total=Sum("amount"))["total"] or 0
+        )
+
+        percent = int((spent / budget.monthly_limit) * 100)
+
+        # 🎨 Color logic
+        if percent >= 80:
+            color = "danger"
+        elif percent >= 50:
+            color = "warning"
+        else:
+            color = "success"
+
+        budget_status.append({
+            "category": budget.category.name,
+            "limit": budget.monthly_limit,
+            "spent": spent,
+            "percent": percent,
+            "color": color
+        })
+
     context = {
-        'income_form': income_form,
-        'expense_form': expense_form,
-        'incomes': incomes,
-        'expenses': expenses,
-        'total_income': total_income,
-        'total_expense': total_expense,
-        'balance': balance,
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "balance": balance,
+        "budget_status": budget_status,
     }
 
-    return render(request, 'finance_app/dashboard.html', context)
+    return render(request, "finance_app/dashboard.html", context)
